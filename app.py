@@ -14,7 +14,11 @@ model_config = {
     "num_classes": 6,
 }
 
-model, tokenizer, device = load_model(model_config, return_model=True)
+# model, tokenizer, device = load_model(model_config, return_model=True)
+
+model, tokenizer = load_model(model_config, return_model=True)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 # Dictionary to convert the predicted class by the model to the class name
 class_names_dic = {
