@@ -6,6 +6,7 @@ import torch
 from utils.model_utils import load_model
 from utils.data_utils import return_kmer, is_dna_sequence
 from flask import Flask, render_template, request
+import numpy as np
 
 app = Flask(__name__, template_folder="templates")
 
@@ -33,44 +34,41 @@ class_names_dic = {
 KMER = 3
 SEQ_MAX_LEN = 512
 
-def huggingface_predict(input):
-    """
-    The input is passed to this function and the model makes a prediction
+def huggingface_predict(sequence):
+    # Get the device
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
-    Parameters
-    ----------
-    input : str
-        The input sequence to be classified
-
-    Returns
-    -------
-    predicted_class : int
-        The predicted class of the input sequence
-    """
+    # Move model to the appropriate device
+    model.to(device)
     
-    # Check if the input sequence is a DNA sequence
-    if not is_dna_sequence(input):
-        return "Invalid Input. Please enter your sequence in upper case", 0
-
-    kmer_seq = return_kmer(input, K=KMER)
-
-    # Tokenize the input sequence
-    inputs = tokenizer(kmer_seq, padding=True, truncation=True, return_tensors="pt")
-    inputs = inputs.to(device)
-
-    # Pass the tokenized inputs through the model to make a prediction
-    outputs = model(**inputs)
-
-    predicted_class = torch.argmax(outputs.logits).item() + 1 # add 1 to convert from 0-indexed to 1-indexed classes
-    prediction_probs = torch.softmax(outputs.logits, dim=1).tolist()[0]
-
-    prediction_probability = prediction_probs[predicted_class - 1]
-    prediction_probability = round(prediction_probability, 3) * 100
-
-    # Convert the predicted class to the class name
-    predicted_class = class_names_dic[predicted_class]
+    # Tokenize the input
+    inputs = tokenizer(
+        sequence,
+        padding=True,
+        truncation=True,
+        max_length=512,
+        return_tensors="pt"
+    )
     
-    return predicted_class, prediction_probability
+    # Move input tensors to the same device as the model
+    inputs = {k: v.to(device) for k, v in inputs.items()}
+    
+    # Get prediction
+    with torch.no_grad():
+        outputs = model(**inputs)
+        
+    # Get probabilities
+    probabilities = torch.nn.functional.softmax(outputs.logits, dim=-1)
+    
+    # Move predictions back to CPU for numpy operations
+    predictions = outputs.logits.cpu().numpy()
+    probabilities = probabilities.cpu().numpy()
+    
+    # Get the predicted class and its probability
+    predicted_class = np.argmax(predictions, axis=1)[0]
+    class_probability = probabilities[0][predicted_class]
+    
+    return predicted_class, class_probability
 
 @app.route('/')
 def home():

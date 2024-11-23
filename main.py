@@ -21,6 +21,7 @@ from utils.model_utils import load_model, compute_metrics
 from utils.viz_utils import count_plot
 from transformers import Trainer, TrainingArguments
 
+
 # Set the device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
